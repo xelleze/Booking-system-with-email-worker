@@ -1,17 +1,29 @@
 "use client";
 
 import { useState, useDeferredValue } from "react";
+import { NominatimResult, BookingInput } from "@/types/db";
+import { useMutation } from "@tanstack/react-query";
 
-interface NominatimResult {
-  place_id: string;
-  display_name: string;
-  lat: string;
-  lon: string;
+async function putBooking(payload: BookingInput) {
+  const res = await fetch("/api/v1/booking", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error("Failed to run booking process");
+  return res.json();
 }
+
 export default function Home() {
-  const [query, setQuery] = useState("");
-  const deferredQuery = useDeferredValue(query);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [moveDate, setMoveDate] = useState("");
+  const [moveLocation, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(moveLocation);
   const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
+  const { mutate, data, isPending, error } = useMutation({
+    mutationFn: putBooking,
+  });
 
   async function search(value: string) {
     const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&q=${encodeURIComponent(
@@ -33,16 +45,37 @@ export default function Home() {
     search(deferredQuery);
   };
 
+  const handleSubmit = () => {
+    mutate({
+      name: name,
+      email: email,
+      move_date: moveDate,
+      moving_address: moveLocation,
+    });
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
       <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <form className="space-y-4">
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSubmit();
+            setName("");
+            setEmail("");
+            setMoveDate("");
+            setQuery("");
+          }}
+        >
           <div>
             <label className="block text-sm font-medium mb-1">Name</label>
             <input
               type="text"
               className="w-full p-2 border rounded-lg focus:outline-none focus:ring focus:ring-blue-300"
               placeholder="Enter your name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
             />
           </div>
           <div>
@@ -51,6 +84,8 @@ export default function Home() {
               type="email"
               className="w-full p-2 border rounded-lg focus:outline-none focus:ring focus:ring-blue-300"
               placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
             />
           </div>
           <div>
@@ -60,6 +95,8 @@ export default function Home() {
             <input
               type="date"
               className="w-full p-2 border rounded-lg focus:outline-none focus:ring focus:ring-blue-300"
+              value={moveDate}
+              onChange={(e) => setMoveDate(e.target.value)}
             />
           </div>
           <div>
@@ -67,7 +104,7 @@ export default function Home() {
               Moving Address
             </label>
             <input
-              value={query}
+              value={moveLocation}
               onChange={(e) => handleChange(e.target.value)}
               type="text"
               placeholder="Enter address…"
@@ -92,13 +129,16 @@ export default function Home() {
               </div>
             )}
           </div>
-
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
-          >
-            Submit
-          </button>
+          <div>
+            <button
+              type="submit"
+              className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
+            >
+              {isPending ? "Saving..." : "Submit"}
+            </button>
+            {error && <p>Error saving booking</p>}
+            {data && <p>Booking sumbited!</p>}
+          </div>
         </form>
       </main>
     </div>
