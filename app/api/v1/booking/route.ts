@@ -22,6 +22,8 @@ export async function POST(req: NextRequest) {
     const pool = getPool();
     const body: unknown = await req.json();
     const boss = await getBoss();
+    let bookingId: number;
+    let createdAt: string;
 
     const { valid, errors } = validateBookingInput(body);
 
@@ -50,26 +52,42 @@ export async function POST(req: NextRequest) {
       customerId = newCustomer.rows[0].id;
     }
 
-    const booking = await pool.query(
-      `INSERT INTO bookings (customer_id, move_date, moving_address)
-       VALUES ($1, $2, $3)
-       RETURNING id, created_at`,
-      [customerId, move_date, moving_address.trim()]
-    );
+    try {
+      const booking = await pool.query(
+        `INSERT INTO bookings (customer_id, move_date, moving_address)
+     VALUES ($1, $2, $3)
+     RETURNING id, created_at`,
+        [customerId, move_date, moving_address.trim()]
+      );
+      bookingId = booking.rows[0].id;
+      createdAt = booking.rows[0].created_at;
+    } catch (err) {
+      console.error("Failed to create booking:", err);
+      return new Response(
+        JSON.stringify({ error: "Could not create booking" }),
+        {
+          status: 500,
+        }
+      );
+    }
 
-    await boss.send("send-booking-email", {
-      customerId,
-      email,
-      name,
-      move_date,
-      moving_address,
-    });
+    try {
+      await boss.send("send-booking-email", {
+        customerId,
+        email,
+        name,
+        move_date,
+        moving_address,
+      });
+    } catch (err) {
+      console.error("Failed to enqueue booking email job:", err);
+    }
 
     return new Response(
       JSON.stringify({
-        booking_id: booking.rows[0].id,
+        booking_id: bookingId,
         customer_id: customerId,
-        created_at: booking.rows[0].created_at,
+        created_at: createdAt,
       }),
       { status: 201 }
     );

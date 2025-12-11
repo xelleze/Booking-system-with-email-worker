@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { BookingEmailJob } from "../types/db";
 import OpenAI from "openai";
 import { getPool } from "../lib/db";
+import { escapeHtml } from "../lib/utils";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
@@ -29,25 +30,31 @@ async function getFunFacts(location: string): Promise<string[]> {
       { "facts": ["Fact 1...", "Fact 2...", "Fact 3..."] }
   `;
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    response_format: { type: "json_object" },
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  const content = response.choices[0].message.content ?? "{}";
-
-  let facts: string[] = [];
   try {
-    const parsed = JSON.parse(content);
-    if (Array.isArray(parsed.facts)) {
-      facts = parsed.facts.filter((f: unknown) => typeof f === "string");
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const content = response.choices[0].message.content ?? "{}";
+
+    try {
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed.facts)) {
+        const facts = parsed.facts.filter(
+          (f: unknown) => typeof f === "string"
+        );
+        return facts.slice(0, 3);
+      }
+    } catch (e) {
+      console.error("Failed to parse fun facts JSON:", e, content);
     }
   } catch (e) {
-    console.error("Failed to parse fun facts JSON:", e, content);
+    console.error("Failed to fetch fun facts from OpenAI:", e);
   }
 
-  return facts;
+  return [];
 }
 
 async function getLocationImages(
@@ -82,13 +89,19 @@ async function start() {
   const boss = new PgBoss({ connectionString: process.env.DATABASE_URL! });
   await boss.start();
   await boss.createQueue("send-booking-email");
-  let status: "sent" | "failed" = "failed";
 
   await boss.work<BookingEmailJob>("send-booking-email", async (jobs) => {
+    let status: "sent" | "failed" = "failed";
     for (const job of jobs) {
       const { customerId, email, name, move_date, moving_address } = job.data;
-      const funFacts = await getFunFacts(moving_address);
-      const images = await getLocationImages(moving_address);
+      const [funFacts, images] = await Promise.all([
+        getFunFacts(moving_address),
+        getLocationImages(moving_address),
+      ]);
+
+      const safeName = escapeHtml(name);
+      const safeAddress = escapeHtml(moving_address);
+      const safeMove_date = escapeHtml(move_date);
 
       const funFactsHtml = funFacts.length
         ? funFacts.map((fact) => `• ${fact}`).join("<br>")
@@ -96,14 +109,14 @@ async function start() {
 
       const imagesSection = images.length
         ? `
-          <h3>What ${moving_address} Looks Like</h3>
+          <h3>What ${safeAddress} Looks Like</h3>
           <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
             <tr>
               <td align="center">
                 ${images
                   .map(
                     (src) =>
-                      `<img src="${src}" width="180" style="border-radius:8px; margin:4px;" alt="${moving_address}" />`
+                      `<img src="${src}" width="180" style="border-radius:8px; margin:4px;" alt="${safeAddress}" />`
                   )
                   .join("")}
               </td>
@@ -111,11 +124,12 @@ async function start() {
           </table>
         `
         : "";
-      const html = `
-        <p>Hello ${name}, your booking #${customerId} was created.</p>
 
-        <p><strong>Move date:</strong> ${move_date}</p>
-        <p><strong>Address:</strong> ${moving_address}</p>
+      const html = `
+        <p>Hello ${safeName}, your booking #${customerId} was created.</p>
+
+        <p><strong>Move date:</strong> ${safeMove_date}</p>
+        <p><strong>Address:</strong> ${safeAddress}</p>
 
         <h3>Fun Facts About Your New Location</h3>
         <p>${funFactsHtml}</p>
