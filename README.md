@@ -6,7 +6,7 @@
 - Node.js (>= 18)
 - Docker & Docker Compose
 - Ett Resend-konto (för e-post)
-- API-nycklar till OpenAI och Pexels (valfritt men rekommenderat för den “fancy” bekräftelsemejlet)
+- API-nycklar till OpenAI och Pexels
 
 ## 1. Klona repo och installera
 
@@ -156,4 +156,5 @@ AI används redan i den här implementationen för att:
 ### 3. Auth & Adminvy
 - Inloggning för att se bokningar, kunder och mejlloggar  
 - Filtrering, sökning och statusrapporter  
+
 
