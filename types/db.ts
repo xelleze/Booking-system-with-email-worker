@@ -11,3 +11,11 @@ export interface NominatimResult {
   lat: string;
   lon: string;
 }
+
+export type BookingEmailJob = {
+  customerId: number;
+  email: string;
+  name: string;
+  move_date: string;
+  moving_address: string;
+};

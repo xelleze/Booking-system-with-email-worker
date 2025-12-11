@@ -1,6 +1,8 @@
-node_modules/
-.env*
-docker-compose.yml
-db/
-scripts/
-tmp/
+node_modules
+.git
+.next
+dist
+Dockerfile*
+docker-compose*
+*.log
+.env

@@ -30,6 +30,21 @@ services:
         condition: service_healthy
     ports:
       - "3000:3000"
+  email-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["node", "dist/workers/email-worker.js"]
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/smartbooking
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      PEXELS_API_KEY: ${PEXELS_API_KEY}
+    depends_on:
+      app:
+        condition: service_started
+      db:
+        condition: service_healthy
 
 volumes:
   pgdata:

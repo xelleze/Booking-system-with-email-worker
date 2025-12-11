@@ -23,3 +23,7 @@ CREATE TABLE email_logs (
   sent_at         timestamptz NOT NULL,
   status          valid_status NOT NULL
 );
+
+
+CREATE INDEX bookings_customer_id_idx ON bookings(customer_id);
+CREATE INDEX email_logs_booking_id_idx ON email_logs(booking_id);

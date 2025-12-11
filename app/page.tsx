@@ -15,6 +15,7 @@ async function putBooking(payload: BookingInput) {
 }
 
 export default function Home() {
+  const [onlyValidLocation, setonlyValidLocation] = useState(true);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [moveDate, setMoveDate] = useState("");
@@ -37,6 +38,7 @@ export default function Home() {
 
   const handleChange = async (value: string) => {
     setQuery(value);
+    setonlyValidLocation(true);
 
     if (value.length < 3) {
       setSuggestions([]);
@@ -61,11 +63,15 @@ export default function Home() {
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
+            if (onlyValidLocation) {
+              return;
+            }
             handleSubmit();
             setName("");
             setEmail("");
             setMoveDate("");
             setQuery("");
+            setonlyValidLocation(true);
           }}
         >
           <div>
@@ -112,16 +118,17 @@ export default function Home() {
             />
 
             {suggestions.length > 0 && (
-              <div className="">
+              <div className="absolute  w-[400px] bg-white border rounded mt-1 ">
                 {suggestions.map((item) => (
                   <button
                     key={item.place_id}
                     type="button"
                     onClick={() => {
+                      setonlyValidLocation(false);
                       setQuery(item.display_name);
                       setSuggestions([]);
                     }}
-                    className=""
+                    className="block w-full text-left p-2 hover:bg-gray-100"
                   >
                     {item.display_name}
                   </button>
@@ -132,7 +139,8 @@ export default function Home() {
           <div>
             <button
               type="submit"
-              className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
+              disabled={onlyValidLocation}
+              className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               {isPending ? "Saving..." : "Submit"}
             </button>

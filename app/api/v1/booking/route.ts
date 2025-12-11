@@ -2,14 +2,26 @@ import { NextRequest } from "next/server";
 import { getPool } from "@/lib/db";
 import { validateBookingInput } from "@/lib/validateBooking";
 import { BookingInput } from "@/types/db";
+import { PgBoss } from "pg-boss";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+let boss: PgBoss | null = null;
+
+async function getBoss() {
+  if (!boss) {
+    boss = new PgBoss({ connectionString: process.env.DATABASE_URL! });
+    await boss.start();
+  }
+  return boss;
+}
 
 export async function POST(req: NextRequest) {
   try {
     const pool = getPool();
     const body: unknown = await req.json();
+    const boss = await getBoss();
 
     const { valid, errors } = validateBookingInput(body);
 
@@ -44,6 +56,14 @@ export async function POST(req: NextRequest) {
        RETURNING id, created_at`,
       [customerId, move_date, moving_address.trim()]
     );
+
+    await boss.send("send-booking-email", {
+      customerId,
+      email,
+      name,
+      move_date,
+      moving_address,
+    });
 
     return new Response(
       JSON.stringify({

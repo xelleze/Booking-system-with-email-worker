@@ -5,15 +5,19 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:worker": "tsc -p tsconfig.worker.json",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.12",
     "next": "16.0.7",
+    "openai": "^6.10.0",
     "pg": "^8.16.3",
+    "pg-boss": "^12.5.2",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "resend": "^6.6.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
