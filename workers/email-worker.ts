@@ -2,12 +2,15 @@ import { PgBoss } from "pg-boss";
 import { Resend } from "resend";
 import { BookingEmailJob } from "../types/db";
 import OpenAI from "openai";
+import { getPool } from "../lib/db";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
+
+const pool = getPool();
 
 async function getFunFacts(location: string): Promise<string[]> {
   const prompt = `
@@ -79,6 +82,7 @@ async function start() {
   const boss = new PgBoss({ connectionString: process.env.DATABASE_URL! });
   await boss.start();
   await boss.createQueue("send-booking-email");
+  let status: "sent" | "failed" = "failed";
 
   await boss.work<BookingEmailJob>("send-booking-email", async (jobs) => {
     for (const job of jobs) {
@@ -107,24 +111,35 @@ async function start() {
           </table>
         `
         : "";
+      const html = `
+        <p>Hello ${name}, your booking #${customerId} was created.</p>
 
-      await resend.emails.send({
-        from: "Booking System <onboarding@resend.dev>",
-        to: email,
-        subject: "Booking Confirmation",
-        html: `
-          <p>Hello ${name}, your booking #${customerId} was created.</p>
+        <p><strong>Move date:</strong> ${move_date}</p>
+        <p><strong>Address:</strong> ${moving_address}</p>
 
-          <p><strong>Move date:</strong> ${move_date}</p>
-          <p><strong>Address:</strong> ${moving_address}</p>
+        <h3>Fun Facts About Your New Location</h3>
+        <p>${funFactsHtml}</p>
+        ${imagesSection}
+      `;
 
-          <h3>Fun Facts About Your New Location</h3>
-          <p>${funFactsHtml}</p>
-           ${imagesSection}
-        `,
-      });
-
-      console.log("Email sent:", email);
+      try {
+        await resend.emails.send({
+          from: "Booking System <onboarding@resend.dev>",
+          to: email,
+          subject: "Booking Confirmation",
+          html,
+        });
+        status = "sent";
+        console.log("Email sent:", email);
+      } catch (err) {
+        status = "failed";
+        console.error("Failed to send email:", email, err);
+      }
+      await pool.query(
+        `INSERT INTO email_logs (booking_id, email_to, body, sent_at, status)
+       VALUES ($1, $2, $3, now(), $4)`,
+        [customerId, email, html, status]
+      );
     }
   });
 
